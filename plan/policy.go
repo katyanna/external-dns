@@ -57,3 +57,30 @@ func (p *CreateOnlyPolicy) Apply(changes *Changes) *Changes {
 		Create: changes.Create,
 	}
 }
+
+// SingleChangePolicy TODO
+type SingleChangePolicy struct{}
+
+// TODO
+func (p *SingleChangePolicy) Apply(changes *Changes) *Changes {
+	if len(changes.Create) > 0 {
+		return &Changes{
+			Create: changes.Create[:1],
+		}
+	}
+
+	if len(changes.UpdateOld) > 0 && len(changes.UpdateNew) > 0 {
+		return &Changes{
+			UpdateOld: changes.UpdateOld[:1],
+			UpdateNew: changes.UpdateNew[:1],
+		}
+	}
+
+	if len(changes.Delete) > 0 {
+		return &Changes{
+			Delete: changes.Delete[:1],
+		}
+	}
+
+	return &Changes{}
+}

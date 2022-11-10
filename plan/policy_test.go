@@ -31,9 +31,16 @@ func TestApply(t *testing.T) {
 	fooV1 := []*endpoint.Endpoint{{DNSName: "foo", Targets: endpoint.Targets{"v1"}}}
 	// the same entry but with different target
 	fooV2 := []*endpoint.Endpoint{{DNSName: "foo", Targets: endpoint.Targets{"v2"}}}
+	// a simple entry
+	barV1 := []*endpoint.Endpoint{{DNSName: "bar", Targets: endpoint.Targets{"v1"}}}
+	// the same entry but with different target
+	barV2 := []*endpoint.Endpoint{{DNSName: "bar", Targets: endpoint.Targets{"v2"}}}
+	fooV1AndBarV1 := []*endpoint.Endpoint{fooV1[0], barV1[0]}
+	fooV2AndBarV2 := []*endpoint.Endpoint{fooV2[0], barV2[0]}
 	// another two simple entries
 	bar := []*endpoint.Endpoint{{DNSName: "bar", Targets: endpoint.Targets{"v1"}}}
 	baz := []*endpoint.Endpoint{{DNSName: "baz", Targets: endpoint.Targets{"v1"}}}
+	barAndBaz := []*endpoint.Endpoint{bar[0], baz[0]}
 
 	for _, tc := range []struct {
 		policy   Policy
@@ -57,6 +64,44 @@ func TestApply(t *testing.T) {
 			&CreateOnlyPolicy{},
 			&Changes{Create: baz, UpdateOld: fooV1, UpdateNew: fooV2, Delete: bar},
 			&Changes{Create: baz, UpdateOld: empty, UpdateNew: empty, Delete: empty},
+		},
+
+		{
+			// SingleChangePolicy TODO.
+			&SingleChangePolicy{},
+			&Changes{Create: barAndBaz, UpdateOld: fooV1, UpdateNew: fooV2, Delete: bar},
+			&Changes{Create: bar, UpdateOld: empty, UpdateNew: empty, Delete: empty},
+		},
+		{
+			// SingleChangePolicy TODO.
+			&SingleChangePolicy{},
+			&Changes{Create: bar, UpdateOld: fooV1, UpdateNew: fooV2, Delete: bar},
+			&Changes{Create: bar, UpdateOld: empty, UpdateNew: empty, Delete: empty},
+		},
+		{
+			// SingleChangePolicy TODO.
+			&SingleChangePolicy{},
+			&Changes{Create: empty, UpdateOld: empty, UpdateNew: empty, Delete: empty},
+			&Changes{Create: empty, UpdateOld: empty, UpdateNew: empty, Delete: empty},
+		},
+		{
+			// SingleChangePolicy TODO.
+			&SingleChangePolicy{},
+			&Changes{Create: empty, UpdateOld: empty, UpdateNew: empty, Delete: barAndBaz},
+			&Changes{Create: empty, UpdateOld: empty, UpdateNew: empty, Delete: bar},
+		},
+		{
+			// SingleChangePolicy TODO.
+			&SingleChangePolicy{},
+			&Changes{Create: empty, UpdateOld: empty, UpdateNew: empty, Delete: bar},
+			&Changes{Create: empty, UpdateOld: empty, UpdateNew: empty, Delete: bar},
+		},
+
+		{
+			// SingleChangePolicy TODO.
+			&SingleChangePolicy{},
+			&Changes{Create: empty, UpdateOld: fooV1AndBarV1, UpdateNew: fooV2AndBarV2, Delete: bar},
+			&Changes{Create: empty, UpdateOld: fooV1, UpdateNew: fooV2, Delete: empty},
 		},
 	} {
 		// apply policy
