@@ -58,10 +58,10 @@ func (p *CreateOnlyPolicy) Apply(changes *Changes) *Changes {
 	}
 }
 
-// SingleChangePolicy TODO
+// SingleChangePolicy allows limiting amount of records modified
 type SingleChangePolicy struct{}
 
-// TODO
+// Apply applies the single change policy which limits batch
 func (p *SingleChangePolicy) Apply(changes *Changes) *Changes {
 	if len(changes.Create) > 0 {
 		return &Changes{

@@ -225,9 +225,13 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 	if plan.Changes.HasChanges() {
 		err = c.Registry.ApplyChanges(ctx, plan.Changes)
 		if err != nil {
-			registryErrorsTotal.Inc()
-			deprecatedRegistryErrors.Inc()
-			return err
+			reducedChanges := &SingleChangePolicy{}.Apply(changes)
+			err = c.Registry.ApplyChanges(ctx, reducedChanges)
+			if err != nil {
+				registryErrorsTotal.Inc()
+				deprecatedRegistryErrors.Inc()
+				return err
+			}
 		}
 	} else {
 		controllerNoChangesTotal.Inc()
