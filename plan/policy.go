@@ -26,6 +26,8 @@ var Policies = map[string]Policy{
 	"sync":        &SyncPolicy{},
 	"upsert-only": &UpsertOnlyPolicy{},
 	"create-only": &CreateOnlyPolicy{},
+	"first-half":  &FirstHalfChangesPolicy{},
+	"last-half":   &LastHalfChangesPolicy{},
 }
 
 // SyncPolicy allows for full synchronization of DNS records.
@@ -59,26 +61,59 @@ func (p *CreateOnlyPolicy) Apply(changes *Changes) *Changes {
 }
 
 // SingleChangePolicy allows limiting amount of records modified
-type SingleChangePolicy struct{}
+type FirstHalfChangesPolicy struct{}
 
 // Apply applies the single change policy which limits batch
-func (p *SingleChangePolicy) Apply(changes *Changes) *Changes {
+func (p *FirstHalfChangesPolicy) Apply(changes *Changes) *Changes {
 	if len(changes.Create) > 0 {
+		halfChanges := len(changes.Create) / 2
 		return &Changes{
-			Create: changes.Create[:1],
+			Create: changes.Create[halfChanges:],
 		}
 	}
 
 	if len(changes.UpdateOld) > 0 && len(changes.UpdateNew) > 0 {
+		halfChanges := len(changes.UpdateNew) / 2
 		return &Changes{
-			UpdateOld: changes.UpdateOld[:1],
-			UpdateNew: changes.UpdateNew[:1],
+			UpdateOld: changes.UpdateOld[halfChanges:],
+			UpdateNew: changes.UpdateNew[halfChanges:],
 		}
 	}
 
 	if len(changes.Delete) > 0 {
+		halfChanges := len(changes.Delete) / 2
 		return &Changes{
-			Delete: changes.Delete[:1],
+			Delete: changes.Delete[halfChanges:],
+		}
+	}
+
+	return &Changes{}
+}
+
+// SingleChangePolicy allows limiting amount of records modified
+type LastHalfChangesPolicy struct{}
+
+// Apply applies the single change policy which limits batch
+func (p *LastHalfChangesPolicy) Apply(changes *Changes) *Changes {
+	if len(changes.Create) > 0 {
+		halfChanges := len(changes.Create) / 2
+		return &Changes{
+			Create: changes.Create[:halfChanges],
+		}
+	}
+
+	if len(changes.UpdateOld) > 0 && len(changes.UpdateNew) > 0 {
+		halfChanges := len(changes.UpdateNew) / 2
+		return &Changes{
+			UpdateOld: changes.UpdateOld[:halfChanges],
+			UpdateNew: changes.UpdateNew[:halfChanges],
+		}
+	}
+
+	if len(changes.Delete) > 0 {
+		halfChanges := len(changes.Delete) / 2
+		return &Changes{
+			Delete: changes.Delete[:halfChanges],
 		}
 	}
 

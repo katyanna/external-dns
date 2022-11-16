@@ -211,7 +211,7 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 		}
 	}
 
-	plan := &plan.Plan{
+	p := &plan.Plan{
 		Policies:           []plan.Policy{c.Policy},
 		Current:            records,
 		Desired:            endpoints,
@@ -220,18 +220,24 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 		ManagedRecords:     c.ManagedRecordTypes,
 	}
 
-	plan = plan.Calculate()
+	p = p.Calculate()
 
-	if plan.Changes.HasChanges() {
-		err = c.Registry.ApplyChanges(ctx, plan.Changes)
+	if p.Changes.HasChanges() {
+		err = c.Registry.ApplyChanges(ctx, p.Changes)
 		if err != nil {
-			reducedChanges := &SingleChangePolicy{}.Apply(changes)
-			err = c.Registry.ApplyChanges(ctx, reducedChanges)
+			// if the batch fails, try first half of batch
+			firstHalfChanges := &plan.FirstHalfChangesPolicy{}.Apply(p.Changes)
+			err = c.Registry.ApplyChanges(ctx, firstHalfChanges)
 			if err != nil {
-				registryErrorsTotal.Inc()
-				deprecatedRegistryErrors.Inc()
-				return err
+				// if the batch fails, try last half of batch
+				lastHalfChanges := &plan.LastHalfChangesPolicy{}.Apply(p.Changes)
+				err = c.Registry.ApplyChanges(ctx, lastHalfChanges)
 			}
+		}
+		if err != nil {
+			registryErrorsTotal.Inc()
+			deprecatedRegistryErrors.Inc()
+			return err
 		}
 	} else {
 		controllerNoChangesTotal.Inc()
