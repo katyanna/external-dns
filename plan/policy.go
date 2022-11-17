@@ -26,6 +26,8 @@ var Policies = map[string]Policy{
 	"sync":        &SyncPolicy{},
 	"upsert-only": &UpsertOnlyPolicy{},
 	"create-only": &CreateOnlyPolicy{},
+	"update-only": &UpdateOnlyPolicy{},
+	"delete-only": &DeleteOnlyPolicy{},
 	"first-half":  &FirstHalfChangesPolicy{},
 	"last-half":   &LastHalfChangesPolicy{},
 }
@@ -60,41 +62,32 @@ func (p *CreateOnlyPolicy) Apply(changes *Changes) *Changes {
 	}
 }
 
-// SingleChangePolicy allows limiting amount of records modified
-type FirstHalfChangesPolicy struct{}
+// UpdateOnlyPolicy allows only updating DNS records.
+type UpdateOnlyPolicy struct{}
 
-// Apply applies the single change policy which limits batch
-func (p *FirstHalfChangesPolicy) Apply(changes *Changes) *Changes {
-	if len(changes.Create) > 0 {
-		halfChanges := len(changes.Create) / 2
-		return &Changes{
-			Create: changes.Create[halfChanges:],
-		}
+// Apply applies the update-only policy which strips out creates and deletions.
+func (p *UpdateOnlyPolicy) Apply(changes *Changes) *Changes {
+	return &Changes{
+		UpdateOld: changes.UpdateOld,
+		UpdateNew: changes.UpdateNew,
 	}
-
-	if len(changes.UpdateOld) > 0 && len(changes.UpdateNew) > 0 {
-		halfChanges := len(changes.UpdateNew) / 2
-		return &Changes{
-			UpdateOld: changes.UpdateOld[halfChanges:],
-			UpdateNew: changes.UpdateNew[halfChanges:],
-		}
-	}
-
-	if len(changes.Delete) > 0 {
-		halfChanges := len(changes.Delete) / 2
-		return &Changes{
-			Delete: changes.Delete[halfChanges:],
-		}
-	}
-
-	return &Changes{}
 }
 
-// SingleChangePolicy allows limiting amount of records modified
-type LastHalfChangesPolicy struct{}
+// DeleteOnlyPolicy allows only deleting DNS records.
+type DeleteOnlyPolicy struct{}
 
-// Apply applies the single change policy which limits batch
-func (p *LastHalfChangesPolicy) Apply(changes *Changes) *Changes {
+// Apply applies the delete-only policy which strips out creates and updates.
+func (p *DeleteOnlyPolicy) Apply(changes *Changes) *Changes {
+	return &Changes{
+		Delete: changes.Delete,
+	}
+}
+
+// FirstHalfChangesPolicy allows limiting amount of records modified.
+type FirstHalfChangesPolicy struct{}
+
+// Apply applies the first half changes policy which limits change list to its first half.
+func (p *FirstHalfChangesPolicy) Apply(changes *Changes) *Changes {
 	if len(changes.Create) > 0 {
 		halfChanges := len(changes.Create) / 2
 		return &Changes{
@@ -114,6 +107,36 @@ func (p *LastHalfChangesPolicy) Apply(changes *Changes) *Changes {
 		halfChanges := len(changes.Delete) / 2
 		return &Changes{
 			Delete: changes.Delete[:halfChanges],
+		}
+	}
+
+	return &Changes{}
+}
+
+// LastHalfChangesPolicy allows limiting amount of records modified.
+type LastHalfChangesPolicy struct{}
+
+// Apply applies the last half changes policy which limits change list to its second half.
+func (p *LastHalfChangesPolicy) Apply(changes *Changes) *Changes {
+	if len(changes.Create) > 0 {
+		halfChanges := len(changes.Create) / 2
+		return &Changes{
+			Create: changes.Create[halfChanges:],
+		}
+	}
+
+	if len(changes.UpdateOld) > 0 && len(changes.UpdateNew) > 0 {
+		halfChanges := len(changes.UpdateNew) / 2
+		return &Changes{
+			UpdateOld: changes.UpdateOld[halfChanges:],
+			UpdateNew: changes.UpdateNew[halfChanges:],
+		}
+	}
+
+	if len(changes.Delete) > 0 {
+		halfChanges := len(changes.Delete) / 2
+		return &Changes{
+			Delete: changes.Delete[halfChanges:],
 		}
 	}
 

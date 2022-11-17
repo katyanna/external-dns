@@ -225,19 +225,37 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 	if p.Changes.HasChanges() {
 		err = c.Registry.ApplyChanges(ctx, p.Changes)
 		if err != nil {
-			// if the batch fails, try first half of batch
-			firstHalfChanges := &plan.FirstHalfChangesPolicy{}.Apply(p.Changes)
-			err = c.Registry.ApplyChanges(ctx, firstHalfChanges)
-			if err != nil {
-				// if the batch fails, try last half of batch
-				lastHalfChanges := &plan.LastHalfChangesPolicy{}.Apply(p.Changes)
-				err = c.Registry.ApplyChanges(ctx, lastHalfChanges)
+			// if the original batch fails, try each action
+			createOnlyPolicy := &plan.CreateOnlyPolicy{}
+			createChanges := createOnlyPolicy.Apply(p.Changes)
+			createErr := c.Registry.ApplyChanges(ctx, createChanges)
+			// if the single action batch fails, try batch in halves
+			if createErr != nil {
+				err = applyHalfActionChanges(c, ctx, createChanges)
+				if err != nil {
+					log.Errorf("Error on record creation: %s", err)
+				}
 			}
-		}
-		if err != nil {
-			registryErrorsTotal.Inc()
-			deprecatedRegistryErrors.Inc()
-			return err
+
+			updateOnlyPolicy := &plan.UpdateOnlyPolicy{}
+			updateChanges := updateOnlyPolicy.Apply(p.Changes)
+			updateErr := c.Registry.ApplyChanges(ctx, updateChanges)
+			if updateErr != nil {
+				err = applyHalfActionChanges(c, ctx, updateChanges)
+				if err != nil {
+					log.Errorf("Error on record update: %s", err)
+				}
+			}
+
+			deleteOnlyPolicy := &plan.DeleteOnlyPolicy{}
+			deleteChanges := deleteOnlyPolicy.Apply(p.Changes)
+			deleteErr := c.Registry.ApplyChanges(ctx, deleteChanges)
+			if deleteErr != nil {
+				err = applyHalfActionChanges(c, ctx, deleteChanges)
+				if err != nil {
+					log.Errorf("Error on record deletion: %s", err)
+				}
+			}
 		}
 	} else {
 		controllerNoChangesTotal.Inc()
@@ -245,6 +263,23 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 	}
 
 	lastSyncTimestamp.SetToCurrentTime()
+	return nil
+}
+
+func applyHalfActionChanges(controller *Controller, ctx context.Context, changes *plan.Changes) error {
+	firstHalfChangesPolicy := &plan.FirstHalfChangesPolicy{}
+	firstHalfChanges := firstHalfChangesPolicy.Apply(changes)
+	err := controller.Registry.ApplyChanges(ctx, firstHalfChanges)
+	if err != nil {
+		lastHalfChangesPolicy := &plan.LastHalfChangesPolicy{}
+		lastHalfChanges := lastHalfChangesPolicy.Apply(changes)
+		err = controller.Registry.ApplyChanges(ctx, lastHalfChanges)
+	}
+	if err != nil {
+		registryErrorsTotal.Inc()
+		deprecatedRegistryErrors.Inc()
+		return err
+	}
 	return nil
 }
 
