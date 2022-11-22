@@ -224,34 +224,30 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 
 	if p.Changes.HasChanges() {
 		err = c.Registry.ApplyChanges(ctx, p.Changes)
+		// If the original batch fails, try each action separately
+		// And if the single action batch fails, try batch halves
 		if err != nil {
-			// if the original batch fails, try each action
-			createOnlyPolicy := &plan.CreateOnlyPolicy{}
-			createChanges := createOnlyPolicy.Apply(p.Changes)
-			createErr := c.Registry.ApplyChanges(ctx, createChanges)
-			// if the single action batch fails, try batch in halves
+			create, update, delete := splitChanges(p.Changes)
+
+			createErr := c.Registry.ApplyChanges(ctx, create)
 			if createErr != nil {
-				err = applyHalfActionChanges(c, ctx, createChanges)
+				err = applyHalfActionChanges(c, ctx, create)
 				if err != nil {
 					log.Errorf("Error on record creation: %s", err)
 				}
 			}
 
-			updateOnlyPolicy := &plan.UpdateOnlyPolicy{}
-			updateChanges := updateOnlyPolicy.Apply(p.Changes)
-			updateErr := c.Registry.ApplyChanges(ctx, updateChanges)
+			updateErr := c.Registry.ApplyChanges(ctx, update)
 			if updateErr != nil {
-				err = applyHalfActionChanges(c, ctx, updateChanges)
+				err = applyHalfActionChanges(c, ctx, update)
 				if err != nil {
 					log.Errorf("Error on record update: %s", err)
 				}
 			}
 
-			deleteOnlyPolicy := &plan.DeleteOnlyPolicy{}
-			deleteChanges := deleteOnlyPolicy.Apply(p.Changes)
-			deleteErr := c.Registry.ApplyChanges(ctx, deleteChanges)
+			deleteErr := c.Registry.ApplyChanges(ctx, delete)
 			if deleteErr != nil {
-				err = applyHalfActionChanges(c, ctx, deleteChanges)
+				err = applyHalfActionChanges(c, ctx, delete)
 				if err != nil {
 					log.Errorf("Error on record deletion: %s", err)
 				}
@@ -264,6 +260,20 @@ func (c *Controller) RunOnce(ctx context.Context) error {
 
 	lastSyncTimestamp.SetToCurrentTime()
 	return nil
+}
+
+func splitChanges(changes *plan.Changes) (*plan.Changes, *plan.Changes, *plan.Changes) {
+	create := &plan.Changes{
+		Create: changes.Create,
+	}
+	update := &plan.Changes{
+		UpdateOld: changes.UpdateOld,
+		UpdateNew: changes.UpdateNew,
+	}
+	delete := &plan.Changes{
+		Create: changes.Delete,
+	}
+	return create, update, delete
 }
 
 func applyHalfActionChanges(controller *Controller, ctx context.Context, changes *plan.Changes) error {

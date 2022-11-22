@@ -26,8 +26,6 @@ var Policies = map[string]Policy{
 	"sync":        &SyncPolicy{},
 	"upsert-only": &UpsertOnlyPolicy{},
 	"create-only": &CreateOnlyPolicy{},
-	"update-only": &UpdateOnlyPolicy{},
-	"delete-only": &DeleteOnlyPolicy{},
 	"first-half":  &FirstHalfChangesPolicy{},
 	"last-half":   &LastHalfChangesPolicy{},
 }
@@ -59,27 +57,6 @@ type CreateOnlyPolicy struct{}
 func (p *CreateOnlyPolicy) Apply(changes *Changes) *Changes {
 	return &Changes{
 		Create: changes.Create,
-	}
-}
-
-// UpdateOnlyPolicy allows only updating DNS records.
-type UpdateOnlyPolicy struct{}
-
-// Apply applies the update-only policy which strips out creates and deletions.
-func (p *UpdateOnlyPolicy) Apply(changes *Changes) *Changes {
-	return &Changes{
-		UpdateOld: changes.UpdateOld,
-		UpdateNew: changes.UpdateNew,
-	}
-}
-
-// DeleteOnlyPolicy allows only deleting DNS records.
-type DeleteOnlyPolicy struct{}
-
-// Apply applies the delete-only policy which strips out creates and updates.
-func (p *DeleteOnlyPolicy) Apply(changes *Changes) *Changes {
-	return &Changes{
-		Delete: changes.Delete,
 	}
 }
 
